@@ -1,0 +1,101 @@
+<html>
+<head>
+	<title>Test Search filters</title>
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+	<script type="text/javascript" src="src/jquery.ba-bbq.js"></script>
+	<script type="text/javascript" src="src/search_filters.js"></script>
+	<style type="text/css">
+		.body { margin: 10px; font-family: 'Helvetica', Arial, sans-serif;}
+		ul { list-style:none; margin:0; padding:0;}
+
+		ul.selectors { margin:0; padding:0px; margin-right:10px; float:left;}
+		ul.selectors li.selector { margin-right:10px; display:inline-block; padding: 5px;}
+		ul.select-list { display:block; position:absolute; background: #fff; padding: 5px 10px;}
+		ul.select-list li { list-style:none; display:block; position:relative; padding: 5px 0;}
+
+		div.order-filters { padding: 10px; }
+		div.order-filters .sfbutton { padding: 2px 10px; margin-right:10px; background: #f0f0f0; }				
+
+
+		div.selector-buttons { padding: 10px; }
+		div.selector-buttons .sfbutton { padding: 2px; background: #f0f0f0; border:1px solid #ddd; }
+		div.selector-buttons .sfbutton.selected { background: #333; color: #fff; }
+
+		.selected { background: blue !important; }
+		.selected1 { background: green !important; }
+		.selected2 { background: yellow !important; }
+	
+		#spinner { position:absolute; top: 10px; right:10px; width:30px; height:30px; background: red; z-index:10;}
+
+		#filter-bar { display:block; position:relative; margin: 10px; padding: 5px; height:24px; border: 1px solid #ddd; background: #f0f0f0; }
+	</style>
+</head>
+<body>
+<div id="spinner"></div>
+
+<form method="post" action="/partners" id="searchbar">
+	<input type="hidden" name="expertise" data-sf-default="" value=""/>
+	<input type="hidden" name="budget" data-sf-default="" value=""/>
+	<input type="hidden" name="order" data-sf-default="" value=""/>
+	<input type="hidden" name="color" data-sf-default="blue" value="blue" />
+
+	<div id="filter-bar">
+		<ul class='selectors'>
+	    <li class='selector'>
+	      <a href='#' class='sflabel' data-sf-label="expertise">designer</a>
+	      <ul class='select-list sflist' data-sf-field="expertise" style='display:none;'>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="designer">designer</a></li>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="developer">developer</a></li>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="">anyone</a></li>
+	      </ul>
+	    </li>
+
+	    <li class='selector'>
+	      <a href='#' class='sflabel' data-sf-label="budget">any</a>
+	      <ul class='select-list sflist' data-sf-field="budget" style='display:none;'>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="">any amount</a></li>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="1000">$1000</a></li>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="2000">$2000</a></li>
+	        <li><a href="#" class='list-item sflistitem' data-sf-value="5000">more than $5000</a></li>
+	      </ul>
+	    </li>	    
+	  </ul>
+
+		<div class="selector">
+			<input type="text" class="sftext" name="location" data-sf-default="blah" placeholder="anywhere" value="blah" />
+		</div>
+	</div>
+
+</form>
+
+<div class="order-filters">
+	<a href="#" class="sfbutton" data-sf-field="order" data-sf-values='["budget asc", "budget desc"]'>Budget</a>
+	<a href="#" class="sfbutton" data-sf-field="order" data-sf-values='["handle asc", "handle desc"]'>By Handle</a>	
+</div>
+
+<div class="selector-buttons">
+	<a href="#" class="sfbutton" data-sf-field="color" data-sf-value="red">Red</a>	
+	<a href="#" class="sfbutton" data-sf-field="color" data-sf-value="blue">Blue</a>
+	<a href="#" class="sfbutton" data-sf-field="color" data-sf-value="green">Green</a>
+	<a href="#" class="sfbutton" data-sf-field="color" data-sf-value="black">Black</a>
+</div>
+
+<script type="text/javascript">
+$(function(){
+	$(document).bind('sf.update', function(e, data){
+		console.log("got Event ");
+		console.log(data)
+	});
+
+	$('#searchbar').searchFilters({
+		
+	});
+
+
+
+});
+
+</script>
+
+</body>
+</html>
