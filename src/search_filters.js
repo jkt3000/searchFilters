@@ -1,100 +1,42 @@
 /* 
  * searchfilters
- * a jquery plugin to handle creating search filters
+ * by John Tajima, 2011
 */
-
-/*
-Looks for any classes of the following type:
-
-.sftext  - text field
-.sflist  - dropdown list
-.sfbtn   - button, groups of buttons (on/off or tri-state)
-.sfcheck - checkboxes
-.sfradio - radio buttons
-
-functionality:
-- listen to filters
-  - .sftext:onchange => trigger hash change
-           :onfocus  => clear placeholder text/default value  
-           :onblur   => ?
-    
-    .sflist:onclick      => show dropdownlist
-    .sflist-item:onclick => update associate hidden input field
-    
-    .sfbtn:onclick       => set as active/next state, clear existing related buttons, update hidden value
-
-    .sfselect: onchange
-    .sfcheck: onclick
-    .sfradio: onclick
-
-- listen on hidden fields: onchange => trigger a update action
-- Updater: listen on 'update' event to 
-
-events:
-  - sf:params_changed => called when any button,list,selector,field is changed
-  - sf:before_update => called before updating is called
-  - sf:after_update  => called after new updating is done
-
-lifecyle:
-0. on init, trigger 'sf:ready' event 
-0.1 listener on sf:ready event triggers initialization (to init values, get updated values if ajax)
-
-1. User clicks button, updates field, etc.
-2. Listener callback:
-   - updates display value
-   - updates hidden field (?)
-   - triggers "params_changed" event
-3. params_changed event listener 
-   - if ajaxed, then 
-       run any before_update callbacks
-       fire before_update event
-       update window hash
-
-   - if normal,
-       run any before_update callbacks
-       fire before_update event
-       update window href with new params
-4. if ajax, after window_hash callback is fired, run any
-    after_update callbacks
-    - trigger after_update event
-
-Options:
-  beforeUpdateCallback: 
-  afterUpdateCallback:
-  ajax: true
-
-
-*/
-
 
 (function($) {
   READY_EVENT         = 'sf.ready';
   BEFORE_UPDATE_EVENT = 'sf.before_update';
   AFTER_UPDATE_EVENT  = 'sf.after_update';
   UPDATE_EVENT        = 'sf.update';
-  var FormFields = [];
-
+  
   $.fn.searchFilters = function(options) {
     var opts = $.extend({}, $.fn.searchFilters.defaults, options);     // create defaults  
     $.fn.searchFilters.url = opts.url || $(this).attr('action');
 
-    // initialize window_hash observer
-    if (opts.ajax === true) { 
-      initHashChangeListener(this, opts);
+    
+    // initialize update observer
+    if (opts.ajax === true) {
+      $.fn.searchFilters.paramParser   = windowHashParser;
+      $.fn.searchFilters.updateHandler = windowHashHandler;
     } else {
-      // init non ajax update handlers
+      $.fn.searchFilters.paramParser   = queryParser;
+      $.fn.searchFilters.updateHandler = queryHandler;
     }
+
     // initialize pageless handler
     if (opts.pageless === true) { alert('not implemented'); }
     
-    cacheFormFields(this, opts); // cache get all watched input fields
     initTextListeners(opts);
     initListListeners(opts);
     initButtonListeners(opts);
     //initCheckboxListeners(opts);
     //initRadioListeners(opts);
-
-    $(this).bind('submit', function(e){e.preventDefault(); }); // disable the default submit
+    
+    disableForm(this, opts);
+    cacheDefaultValues(this, opts);
+    $(document).bind(UPDATE_EVENT, $.fn.searchFilters.updateHandler);
+    $(document).bind(READY_EVENT, $.fn.searchFilters.updateHandler);
+    
     $(this).trigger(READY_EVENT);
     return this;
   };
@@ -112,15 +54,71 @@ Options:
     afterUpdate: noop,
     indicator: '#spinner'
   };
-  $.fn.searchFilters.url          = null;
-  $.fn.searchFilters.beforeUpdate = null;
-  $.fn.searchFilters.afterUpdate  = null;
+  $.fn.searchFilters.url           = null;
+  $.fn.searchFilters.beforeUpdate  = null;
+  $.fn.searchFilters.afterUpdate   = null;
+  $.fn.searchFilters.updateHandler = null;
+  
+  $.fn.searchFilters.currentParams = {};
+  $.fn.searchFilters.defaultValues = {};
+
 
   // private functions
   // -------------------------------------------------
   
-  function cacheFormFields(el, opts) {
-    FormFields = $.map(el.find("[data-sf-default]"), function(e, i){ return e; });
+  function queryParser() {
+    var search = window.location.search !== "" ? window.location.search.slice(1) : window.location.search;
+    return $.deparam(search);
+  };
+
+  function windowHashParser() {
+    return $.deparam($.param.fragment()) || {};
+  };
+
+  function windowHashHandler(e, data) {
+    console.log("Got event ");
+    console.log(e);
+    console.log(data);
+    if (e.namespace === 'ready') {
+      // handle the ready event
+      // 
+    } else {
+    }
+    // get default values
+    // get current values
+    // get newest changes
+    // create updated params
+    // request new results - callback populates table
+    // with newest change, update labels
+    // if event is ready, initialize all views
+
+
+  }
+
+
+  function disableForm(el) {
+    $(el).bind('submit', function(e){e.preventDefault(); }); // disable the default submit
+  }
+  
+  function cacheDefaultValues(el) {
+    $.each($(el).find("[data-sf-default]"), function(i, el){ 
+      var key = $(el).attr('name');
+      var val = $(el).attr('data-sf-default');
+      $.fn.searchFilters.defaultValues[key] = val;
+    });
+    console.log("default values are");
+    console.log($.fn.searchFilters.defaultValues);    
+  }
+
+  // act on UPDATE_EVENTs.
+  function updateWatcher(el, opts) {
+    $(document).bind(UPDATE_EVENT, function(e){
+      
+    });
+  }
+
+  function ajaxUpdateWatcher(el, opts) {
+    
   }
 
 
@@ -147,10 +145,6 @@ Options:
   // -----------------------------------------------
   function initButtonListeners(opts) { 
     $('.sfbutton').bind('click', updateButtonHandler);
-
-    // add listener to all btns
-    // 
-
   }
 
   // button classes can be selected0 selected1 ... selectedN  
@@ -158,18 +152,7 @@ Options:
     var $target    = $(e.currentTarget);
     var field      = $target.attr('data-sf-field');
     var $all_els   = $('.sfbutton[data-sf-field="' + field + '"]');
-    var values     = null;
-
-    if ($target.attr('data-sf-values') === undefined) {
-      values = $.makeArray($target.attr('data-sf-value'));      
-    } else {
-      try {
-        values = $.parseJSON($target.attr('data-sf-values'));        
-      } catch(e) {
-        alert("Error parsing json. " + e);
-      }
-    }
-  
+    var values     = $target.attr('data-sf-values') === undefined ? $.makeArray($target.attr('data-sf-value')) : $.parseJSON($target.attr('data-sf-values'));  
     var classNames = $.map(values, function(val, i){ return i == 0 ? 'selected' : 'selected'+i; });  // [selected, selected1, selected2, ...]
 
     // get next index
@@ -180,13 +163,15 @@ Options:
         break;
       }
     }
+    var nextValue = values[nextIndex];
+    var label     = $target.html();
 
     // clear old classnames
     $.each($all_els, function(i, el){
       $.each(classNames, function(j, val){ $(el).removeClass(val); });
     });
-    // set new class
-    $target.addClass(classNames[nextIndex]); 
+    $target.addClass(classNames[nextIndex]); // set new class
+    $target.trigger(UPDATE_EVENT, {field:field, value:nextValue, label:label})
   }
 
 
