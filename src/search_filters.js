@@ -3,6 +3,8 @@
  * by John Tajima, 2011
 */
 
+window.debug = true;
+
 (function($) {
   READY_EVENT         = 'sf.ready';
   BEFORE_UPDATE_EVENT = 'sf.before_update';
@@ -12,44 +14,54 @@
   $.fn.searchFilters = function(options) {
     var opts = $.extend({}, $.fn.searchFilters.defaults, options);     // create defaults  
     $.fn.searchFilters.url = opts.url || $(this).attr('action');
-
-    
-    // initialize update observer
-    if (opts.ajax === true) {
-      $.fn.searchFilters.paramParser   = windowHashParser;
-      $.fn.searchFilters.updateHandler = windowHashHandler;
-    } else {
-      $.fn.searchFilters.paramParser   = queryParser;
-      $.fn.searchFilters.updateHandler = queryHandler;
-    }
+    var form = this;
+    var spinner = $(opts.indicator);
 
     // initialize pageless handler
-    if (opts.pageless === true) { alert('not implemented'); }
+    if (opts.pageless === true) { 
+      alert('not implemented'); 
+    }
+    var initial_params = $.extend({}, defaultParamParser(this), $.deparam.fragment());
     
-    initTextListeners(opts);
-    initListListeners(opts);
-    initButtonListeners(opts);
-    //initCheckboxListeners(opts);
-    //initRadioListeners(opts);
-    
-    disableForm(this, opts);
-    cacheDefaultValues(this, opts);
-    $(document).bind(UPDATE_EVENT, $.fn.searchFilters.updateHandler);
-    $(document).bind(READY_EVENT, $.fn.searchFilters.updateHandler);
-    
-    $(this).trigger(READY_EVENT);
+    textFilters     = new TextSearchFilter();
+    buttonFilters   = new ButtonFilter();
+    orderbtnFilters = new OrderButtonFilter();
+    listFilters     = new ListFilter();
+
+    $(window).bind('hashchange', function(event){
+      spinner.show();
+      
+      // update states
+      var params = $.extend({}, defaultParamParser(form), $.deparam.fragment());
+      buttonFilters.setState(params);
+      textFilters.setState(params);
+      listFilters.setState(params);
+      orderbtnFilters.setState(params);
+      
+      // update form values 
+      $.each(params, function(key, value){
+        form.find("input[name='"+ key + "']").val(value);
+      });
+      
+      // get new results
+      
+      // ajax request
+      spinner.hide();
+    });
+
+    $(window).trigger('hashchange');
     return this;
   };
   
   //
   // publicly accessible methods and settings
   //
+
   $.fn.searchFilters.defaults = {
     url: null,            // by default, use the form action
     pageless: null,       // domid of the pageless url
     pageless_url: null,   // url of pageless
     pageless_options: {}, // hash of pageless options
-    ajax: true,           // true if use windowHash change
     beforeUpdate: noop, 
     afterUpdate: noop,
     indicator: '#spinner'
@@ -57,179 +69,190 @@
   $.fn.searchFilters.url           = null;
   $.fn.searchFilters.beforeUpdate  = null;
   $.fn.searchFilters.afterUpdate   = null;
-  $.fn.searchFilters.updateHandler = null;
-  
-  $.fn.searchFilters.currentParams = {};
-  $.fn.searchFilters.defaultValues = {};
 
-
+  // -------------------------------------------------
   // private functions
   // -------------------------------------------------
   
-  function queryParser() {
-    var search = window.location.search !== "" ? window.location.search.slice(1) : window.location.search;
-    return $.deparam(search);
+  function submitChange(field, value) {
+    var params = $.deparam.fragment();
+    params[field] = value;
+    $.bbq.pushState(params);
   };
-
-  function windowHashParser() {
-    return $.deparam($.param.fragment()) || {};
-  };
-
-  function windowHashHandler(e, data) {
-    console.log("Got event ");
-    console.log(e);
-    console.log(data);
-    if (e.namespace === 'ready') {
-      // handle the ready event
-      // 
-    } else {
+  
+  //
+  // textField Filter 
+  //
+  var TextSearchFilter = Class.extend({
+    init: function(events) {
+      this.selector    = '.sftext';
+      this.$elements   = $(this.selector);
+      this.$elements.bind('blur', this.changeHandler.bind(this));
+    },
+    
+    // update/set the contents for { field => value }
+    setState: function(params) {
+      $.each(this.$elements, function(i, el){
+        var value = params[$(el).attr('name')];
+        if (value !== undefined) { $(el).val(value); }
+      });
+    },
+    
+    changeHandler: function(event){
+      var $el = $(event.currentTarget);
+      submitChange($el.attr('name'), $el.val());
+      return false;
     }
-    // get default values
-    // get current values
-    // get newest changes
-    // create updated params
-    // request new results - callback populates table
-    // with newest change, update labels
-    // if event is ready, initialize all views
-
-
+  });
+  
+  //
+  // Button Filters - groups of related buttons on same field
+  //
+  var ButtonFilter = Class.extend({
+    init: function(events) {
+      this.selector  = '.sfbutton[data-sf-value]';
+      this.$elements = $(this.selector);
+      this.$elements.bind('click', this.changeHandler.bind(this));
+    },
+    
+    setState: function(params) {
+      var self = this;
+      $.each(this.$elements, function(i, el){
+        var field = $(el).attr('data-sf-field');
+        var value = params[field];
+        if (value !== undefined) {
+          if ($(el).attr('data-sf-value') === value) {
+            $(el).addClass('selected');
+            $("input[name='" + field + "']").val(value); // set hidden vlaue
+          } else {
+            $(el).removeClass('selected');
+          }
+        }
+      });
+    },
+    
+    changeHandler: function(event) {
+      var $el = $(event.currentTarget);
+      submitChange($el.attr('data-sf-field'), $el.attr('data-sf-value'));
+      return false;
+    }
+  });
+  
+  //
+  // OrderButton Filter - button with multiple states 
+  //
+  var OrderButtonFilter = Class.extend({
+    init: function() {
+      this.selector  = '.sfbutton[data-sf-values]';
+      this.$elements = $(this.selector);
+      this.$elements.bind('click', this.changeHandler.bind(this));
+    },
+    
+    setState: function(params) {
+      var self = this;
+      // clear class
+      $.each(this.$elements, function(i,el){
+        var values = $.parseJSON($(el).attr('data-sf-values'));  
+        self.$elements.removeClass(function(){
+          var klasses = $.map(values, function(val, i){ return i == 0 ? 'selected' : 'selected'+i; });
+          return klasses.join(' ');
+        });
+      });
+      
+      // set new class of active button
+      $.each(this.$elements, function(i, el){
+        var field  = $(el).attr('data-sf-field');
+        var value  = params[field];
+        var values = $.parseJSON($(el).attr('data-sf-values'));  
+        var index  = values.indexOf(value);
+        if (index >= 0) {
+          $(el).addClass( index == 0 ? 'selected' : 'selected' + index);
+        }
+      });
+    },
+    
+    changeHandler: function(event) {
+      var $el       = $(event.currentTarget);
+      var field     = $el.attr('data-sf-field');
+      var values    = $.parseJSON($el.attr('data-sf-values'));
+      var curr      = $("input[name='" + field + "']").val();
+      var currIndex = values.indexOf(curr); // what the current value is
+      var nextIndex = currIndex + 1 >= values.length ? 0 : currIndex + 1;
+      var value     = values[nextIndex];
+      submitChange(field, value);
+      return false;
+    }
+  });
+  
+  
+  //
+  // ListFilter
+  //
+  ListFilter = Class.extend({
+    init: function(events) {
+      this.listselector  = '.sflist';
+      this.labelselector = '.sflabel';
+      this.itemselector  = '.sflistitem';
+      this.$listEls      = $(this.listselector);
+      this.$labelEls     = $(this.labelselector);
+      this.$listItemEls  = $(this.itemselector);
+      this.fields        = $.map(this.$listEls, function(el,i) { return $(el).attr('data-sf-field') });
+      
+      $.each(this.$labelEls, function(i, el){
+        var currfield  = $(el).attr('data-sf-label');
+        if (this.fields.indexOf(currfield) >= 0) {
+          $(el).bind('click', this.listToggleHandler.bind(this));
+        }
+      }.bind(this));
+      this.$listItemEls.bind('click', this.changeHandler.bind(this));  
+    },
+    
+    setState: function(params){
+      var self = this
+      $.each(this.$labelEls, function(i, el){
+        var field = $(el).attr('data-sf-label');
+        var value = params[field];
+        if (value !== undefined) {
+          var list = $(".sflist[data-sf-field='"+ field + "']"); // find the associated list
+          var label = list.find(".sflistitem[data-sf-value='" + value + "']").html(); // find list item within this list
+          $(el).html(label);
+        }
+      });
+    },
+    
+    listToggleHandler: function(event, data) {
+      var value = $(event.currentTarget).attr('data-sf-label');
+      this.$listEls.each(function(i, el){
+        $(el).attr('data-sf-field') === value ? $(el).slideToggle() : $(el).slideUp();
+      });
+      return false;
+    },
+    
+    changeHandler: function(event, data) {
+      var el    = $(event.currentTarget);
+      var value = el.attr('data-sf-value');
+      var field = el.parents('.sflist').attr('data-sf-field');
+      el.parents('.sflist').slideUp();
+      submitChange(field, value);
+      return false;
+    }
+  });
+  
+  
+  // parses the default values for search filters from HTML
+  function defaultParamParser(el) {
+    var params = {}
+    $.each($(el).find("[data-sf-default]"), function(i, el){
+      params[$(el).attr('name')] = $(el).attr('data-sf-default');
+    });
+    return params;
   }
 
 
   function disableForm(el) {
     $(el).bind('submit', function(e){e.preventDefault(); }); // disable the default submit
   }
-  
-  function cacheDefaultValues(el) {
-    $.each($(el).find("[data-sf-default]"), function(i, el){ 
-      var key = $(el).attr('name');
-      var val = $(el).attr('data-sf-default');
-      $.fn.searchFilters.defaultValues[key] = val;
-    });
-    console.log("default values are");
-    console.log($.fn.searchFilters.defaultValues);    
-  }
-
-  // act on UPDATE_EVENTs.
-  function updateWatcher(el, opts) {
-    $(document).bind(UPDATE_EVENT, function(e){
-      
-    });
-  }
-
-  function ajaxUpdateWatcher(el, opts) {
-    
-  }
-
-
-  // text filter
-  //------------------------------------------------
-
-  function initTextListeners(opts) { 
-    // $('.sftext').bind('focus', textFieldFocusHandler);
-    $('.sftext').bind('blur', textFieldBlurHandler);
-  }
-
-  function textFieldFocusHandler(e) {
-    // noop
-  }
-
-  function textFieldBlurHandler(e) {
-    var el = $(e.currentTarget);
-    var field = el.attr('name');
-    var value = el.val();
-    el.trigger(UPDATE_EVENT, {field:field, value:value});
-  }
-
-  // button filters
-  // -----------------------------------------------
-  function initButtonListeners(opts) { 
-    $('.sfbutton').bind('click', updateButtonHandler);
-  }
-
-  // button classes can be selected0 selected1 ... selectedN  
-  function updateButtonHandler(e) {
-    var $target    = $(e.currentTarget);
-    var field      = $target.attr('data-sf-field');
-    var $all_els   = $('.sfbutton[data-sf-field="' + field + '"]');
-    var values     = $target.attr('data-sf-values') === undefined ? $.makeArray($target.attr('data-sf-value')) : $.parseJSON($target.attr('data-sf-values'));  
-    var classNames = $.map(values, function(val, i){ return i == 0 ? 'selected' : 'selected'+i; });  // [selected, selected1, selected2, ...]
-
-    // get next index
-    var nextIndex = 0;
-    for (var i=0, len=classNames.length; i < len; i++) {
-      if ($target.hasClass(classNames[i])) {
-        nextIndex = classNames[i+1] === undefined ? 0 : i+1;
-        break;
-      }
-    }
-    var nextValue = values[nextIndex];
-    var label     = $target.html();
-
-    // clear old classnames
-    $.each($all_els, function(i, el){
-      $.each(classNames, function(j, val){ $(el).removeClass(val); });
-    });
-    $target.addClass(classNames[nextIndex]); // set new class
-    $target.trigger(UPDATE_EVENT, {field:field, value:nextValue, label:label})
-  }
-
-
-  // List filters
-  // 
-  // listener for all .sflist & .sflist-item elements
-  // when click .sflabel, show list items
-  // when click on .sflistitem, update values
-  //------------------------------------------------
-  function initListListeners(opts) {
-    var $listEls     = $('.sflist');
-    var $labelEls    = $('.sflabel');
-    var $listItemEls = $('.sflistitem');
-    var fields       = $.map($listEls, function(el,i) { return $(el).attr('data-sf-field') });
-    
-    // listeners on label
-    $.each($labelEls, function(i, el){
-      var currfield  = $(el).attr('data-sf-label');
-      if (fields.indexOf(currfield) >= 0) {
-        $(el).bind('click', listToggleHandler);
-        $(document).bind(UPDATE_EVENT, updateLabelHandler);
-      }
-    });
-    
-    // listeners on list items
-    $('.sflistitem').bind('click', listItemHandler);
-  }
-
-  function listToggleHandler(e) {
-    var value = $(e.currentTarget).attr('data-sf-label');
-    $('.sflist').each(function(i, el){
-      $(el).attr('data-sf-field') === value ? $(el).slideToggle() : $(el).slideUp();
-    });
-  }
-
-  function updateLabelHandler(e, data) {
-    $('.sflabel[data-sf-label="'+data.field+'"]').html(data.label);
-  }
-
-  function listItemHandler(e) {
-    //console.log("listItemHandler ");
-    var el         = $(e.currentTarget);
-    var value      = el.attr('data-sf-value');
-    var label      = el.html();
-    var field      = el.parents('.sflist').attr('data-sf-field');
-    
-    el.parents('.sflist').slideUp();
-    el.trigger(UPDATE_EVENT, {field:field, label:label, value:value} );
-  }
-
-
-  function initHashChangeListener(el, opts) {
-
-  }
-
-
   function noop() { return; }
-
   function log(msg) {
     if (window.console && window.console.log && window['debug'] === true) {
       console.log(msg);

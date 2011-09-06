@@ -3,6 +3,7 @@
   <title>Test Search filters</title>
   <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
   <script type="text/javascript" src="src/jquery.ba-bbq.js"></script>
+  <script type="text/javascript" src="src/jquery.class.js"></script>
   <script type="text/javascript" src="src/search_filters.js"></script>
   <style type="text/css">
     .body { margin: 10px; font-family: 'Helvetica', Arial, sans-serif;}
@@ -34,9 +35,9 @@
 <div id="spinner"></div>
 
 <form method="post" action="/partners" id="searchbar">
-  <input type="hidden" name="expertise" data-sf-default="" value=""/>
+  <input type="hidden" name="expertise" data-sf-default="developer" value=""/>
   <input type="hidden" name="budget" data-sf-default="" value=""/>
-  <input type="hidden" name="order" data-sf-default="" value=""/>
+  <input type="hidden" name="order" data-sf-default="budget desc" value=""/>
   <input type="hidden" name="color" data-sf-default="blue" value="blue" />
 
   <div id="filter-bar">
@@ -51,7 +52,7 @@
       </li>
 
       <li class='selector'>
-        <a href='#' class='sflabel' data-sf-label="budget">any</a>
+        <a href='#' class='sflabel' data-sf-label="budget">any amount</a>
         <ul class='select-list sflist' data-sf-field="budget" style='display:none;'>
           <li><a href="#" class='list-item sflistitem' data-sf-value="">any amount</a></li>
           <li><a href="#" class='list-item sflistitem' data-sf-value="1000">$1000</a></li>
@@ -62,7 +63,7 @@
     </ul>
 
     <div class="selector">
-      <input type="text" class="sftext" name="location" data-sf-default="blah" placeholder="anywhere" value="blah" />
+      <input type="text" class="sftext" name="location" data-sf-default="vancouver" placeholder="anywhere" value="" />
     </div>
   </div>
 
@@ -82,16 +83,8 @@
 
 <script type="text/javascript">
 $(function(){
-  $(document).bind('sf.update', function(e, data){
-    console.log("got Event ");
-    console.log(data)
-  });
 
-  $('#searchbar').searchFilters({
-    
-  });
-
-
+  $('#searchbar').searchFilters({ajax:false});
 
 });
 
