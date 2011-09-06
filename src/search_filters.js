@@ -15,6 +15,7 @@ window.debug = true;
     var opts = $.extend({}, $.fn.searchFilters.defaults, options);     // create defaults  
     $.fn.searchFilters.url = opts.url || $(this).attr('action');
     var form = this;
+    var spinner = $(opts.indicator);
 
     // initialize pageless handler
     if (opts.pageless === true) { 
@@ -28,20 +29,24 @@ window.debug = true;
     listFilters     = new ListFilter();
 
     $(window).bind('hashchange', function(event){
-      var params = $.extend({},defaultParamParser(form), $.deparam.fragment());
-
+      spinner.show();
+      
+      // update states
+      var params = $.extend({}, defaultParamParser(form), $.deparam.fragment());
       buttonFilters.setState(params);
       textFilters.setState(params);
       listFilters.setState(params);
       orderbtnFilters.setState(params);
       
-      // update current settings for list, button, order selectors
+      // update form values 
       $.each(params, function(key, value){
         form.find("input[name='"+ key + "']").val(value);
       });
       
       // get new results
+      
       // ajax request
+      spinner.hide();
     });
 
     $(window).trigger('hashchange');
@@ -72,7 +77,6 @@ window.debug = true;
   function submitChange(field, value) {
     var params = $.deparam.fragment();
     params[field] = value;
-    console.log("field "+field + " value: "+value)
     $.bbq.pushState(params);
   };
   
@@ -146,7 +150,6 @@ window.debug = true;
     
     setState: function(params) {
       var self = this;
-      
       // clear class
       $.each(this.$elements, function(i,el){
         var values = $.parseJSON($(el).attr('data-sf-values'));  
@@ -156,7 +159,7 @@ window.debug = true;
         });
       });
       
-      
+      // set new class of active button
       $.each(this.$elements, function(i, el){
         var field  = $(el).attr('data-sf-field');
         var value  = params[field];
@@ -174,11 +177,8 @@ window.debug = true;
       var values    = $.parseJSON($el.attr('data-sf-values'));
       var curr      = $("input[name='" + field + "']").val();
       var currIndex = values.indexOf(curr); // what the current value is
-      console.log("Current index "+ currIndex);
       var nextIndex = currIndex + 1 >= values.length ? 0 : currIndex + 1;
-      console.log("next index "+ nextIndex);
       var value     = values[nextIndex];
-      console.log("nextvalue "+value)
       submitChange(field, value);
       return false;
     }
@@ -242,38 +242,10 @@ window.debug = true;
   // parses the default values for search filters from HTML
   function defaultParamParser(el) {
     var params = {}
-    $.each($(el).find("[data-sf-default]"), function(i, el){ 
-      var key = $(el).attr('name');
-      var val = $(el).attr('data-sf-default');
-      params[key] = val;
+    $.each($(el).find("[data-sf-default]"), function(i, el){
+      params[$(el).attr('name')] = $(el).attr('data-sf-default');
     });
     return params;
-  }
-
-  //
-  // ajax parser & handler
-  //-------------------------------------------------
-
-  // parses values in the hash of the URL
-  function windowHashParser() {
-    log('windowHashpareser')
-    return $.deparam.fragment();
-  };
-
-  function windowHashHandler(e, data) {
-    if (e.namespace === 'ready') {
-      // handle the ready event
-      // 
-    } else {
-    
-    }
-    // get default values
-    // get current values
-    // get newest changes
-    // create updated params
-    // request new results - callback populates table
-    // with newest change, update labels
-    // if event is ready, initialize all views
   }
 
 
