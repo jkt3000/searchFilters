@@ -3,6 +3,7 @@
   <title>Test Search filters</title>
   <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
   <script type="text/javascript" src="src/jquery.ba-bbq.js"></script>
+  <script type="text/javascript" src="src/jquery.class.js"></script>
   <script type="text/javascript" src="src/search_filters.js"></script>
   <style type="text/css">
     .body { margin: 10px; font-family: 'Helvetica', Arial, sans-serif;}
@@ -36,7 +37,7 @@
 <form method="post" action="/partners" id="searchbar">
   <input type="hidden" name="expertise" data-sf-default="" value=""/>
   <input type="hidden" name="budget" data-sf-default="" value=""/>
-  <input type="hidden" name="order" data-sf-default="" value=""/>
+  <input type="hidden" name="order" data-sf-default="budget desc" value=""/>
   <input type="hidden" name="color" data-sf-default="blue" value="blue" />
 
   <div id="filter-bar">
@@ -88,7 +89,7 @@ $(function(){
   });
 
   $('#searchbar').searchFilters({
-    
+    ajax:false
   });
 
 
