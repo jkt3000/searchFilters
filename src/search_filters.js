@@ -22,22 +22,26 @@ window.debug = true;
     }
     var initial_params = $.extend({}, defaultParamParser(this), $.deparam.fragment());
     
-    textFilters   = new TextSearchFilter();
-    buttonFilters = new ButtonFilter();
-    listFilters   = new ListFilter();
+    textFilters     = new TextSearchFilter();
+    buttonFilters   = new ButtonFilter();
+    orderbtnFilters = new OrderButtonFilter();
+    listFilters     = new ListFilter();
 
     $(window).bind('hashchange', function(event){
-      var changes = $.deparam.fragment();
-      var params = $.extend({},defaultParamParser(form), changes);
+      var params = $.extend({},defaultParamParser(form), $.deparam.fragment());
+
       buttonFilters.setState(params);
       textFilters.setState(params);
       listFilters.setState(params);
+      orderbtnFilters.setState(params);
       
       // update current settings for list, button, order selectors
       $.each(params, function(key, value){
         form.find("input[name='"+ key + "']").val(value);
       });
+      
       // get new results
+      // ajax request
     });
 
     $(window).trigger('hashchange');
@@ -102,8 +106,8 @@ window.debug = true;
   //
   var ButtonFilter = Class.extend({
     init: function(events) {
-      this.selector    = '.sfbutton[data-sf-value]';
-      this.$elements   = $(this.selector);
+      this.selector  = '.sfbutton[data-sf-value]';
+      this.$elements = $(this.selector);
       this.$elements.bind('click', this.changeHandler.bind(this));
     },
     
@@ -133,6 +137,52 @@ window.debug = true;
   //
   // OrderButton Filter - button with multiple states 
   //
+  var OrderButtonFilter = Class.extend({
+    init: function() {
+      this.selector  = '.sfbutton[data-sf-values]';
+      this.$elements = $(this.selector);
+      this.$elements.bind('click', this.changeHandler.bind(this));
+    },
+    
+    setState: function(params) {
+      var self = this;
+      
+      // clear class
+      $.each(this.$elements, function(i,el){
+        var values = $.parseJSON($(el).attr('data-sf-values'));  
+        self.$elements.removeClass(function(){
+          var klasses = $.map(values, function(val, i){ return i == 0 ? 'selected' : 'selected'+i; });
+          return klasses.join(' ');
+        });
+      });
+      
+      
+      $.each(this.$elements, function(i, el){
+        var field  = $(el).attr('data-sf-field');
+        var value  = params[field];
+        var values = $.parseJSON($(el).attr('data-sf-values'));  
+        var index  = values.indexOf(value);
+        if (index >= 0) {
+          $(el).addClass( index == 0 ? 'selected' : 'selected' + index);
+        }
+      });
+    },
+    
+    changeHandler: function(event) {
+      var $el       = $(event.currentTarget);
+      var field     = $el.attr('data-sf-field');
+      var values    = $.parseJSON($el.attr('data-sf-values'));
+      var curr      = $("input[name='" + field + "']").val();
+      var currIndex = values.indexOf(curr); // what the current value is
+      console.log("Current index "+ currIndex);
+      var nextIndex = currIndex + 1 >= values.length ? 0 : currIndex + 1;
+      console.log("next index "+ nextIndex);
+      var value     = values[nextIndex];
+      console.log("nextvalue "+value)
+      submitChange(field, value);
+      return false;
+    }
+  });
   
   
   //
